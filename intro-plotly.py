@@ -17,7 +17,15 @@ df = pd.read_csv("intro_bees.csv")
 df = df.groupby(["State", 'ANSI', 'Affected by', 'Year', 'state_code'])[
     ['Pct of Colonies Impacted']].mean()
 df.reset_index(inplace=True)
-print(df[:5])
+
+plagueNames = {
+    'Disease': 'Disease',
+    'Other': 'Other',
+    'Pesticides': 'Pesticides',
+    'Pests_excl_Varroa': 'P. without Varroa',
+    'Unknown': 'Unknown',
+    'Varroa_mites': 'Varroa Mites'
+}
 
 # Plague types: ['Disease', 'Other', 'Pesticides', 'Pests_excl_Varroa', 'Unknown', 'Varroa_mites']
 affectationOptions = [
@@ -99,6 +107,7 @@ app.layout = html.Div(
             'justify-content': 'space-evenly'
         }
         ),
+        html.Div([dcc.Graph(id='bee_line', figure={})]),
     ], style={'font-family': 'Sans-Serif'})
 
 # Communicate graphs with UI components (MAP)
@@ -111,8 +120,6 @@ app.layout = html.Div(
     Input(component_id='slct_affect', component_property='value'),
 )
 def update_graph(yr_slctd, affect_slctd):
-    print(yr_slctd)
-    print(type(yr_slctd))
 
     container = "Selected year: {}, Affection: {}".format(
         yr_slctd, affect_slctd)
@@ -143,18 +150,30 @@ def update_graph(yr_slctd, affect_slctd):
 
 @app.callback(
     Output(component_id='bee_pie', component_property='figure'),
-    Input(component_id='slct_year', component_property='value')
+    Output(component_id='bee_line', component_property='figure'),
+    Input(component_id='slct_year', component_property='value'),
+    Input(component_id='slct_affect', component_property='value'),
 )
-def update_pie(yr_slctd):
-    dff = df.copy()
-    dff = dff[dff["Year"] == yr_slctd]
+def update_pie(yr_slctd, affect_slctd):
+    # Pie data
+    pie_df = df.copy()
+    pie_df = pie_df[pie_df["Year"] == yr_slctd]
+    chart_df = pie_df.groupby('Affected by').mean()
+    chart_df['Affected by'] = chart_df.index
+    print('chart_df')
+    print(chart_df)
 
-    chartDF = dff.groupby('Affected by').mean()
-    chartDF['Affected by'] = chartDF.index
-    print(chartDF)
+    # Line data
+    line_df = df.copy()
+    line_df = line_df[line_df['Affected by'] == affect_slctd]
+    line_chart_df = line_df.groupby(['Year']).mean()
+    line_chart_df['Year'] = line_chart_df.index
+    print('line_chart_df')
+    print(line_chart_df)
 
-    fig = px.pie(
-        chartDF,
+    # Pie Cahrt
+    pie_fig = px.pie(
+        chart_df,
         title=f"Diseases in year {yr_slctd}",
         values='Pct of Colonies Impacted',
         names='Affected by',
@@ -162,7 +181,17 @@ def update_pie(yr_slctd):
         template='plotly_dark'
     )
 
-    return fig
+    # Line Chart
+    line_fig = px.line(
+        line_chart_df,
+        x='Year',
+        y='Pct of Colonies Impacted',
+        title=f'Trend of disease: {affect_slctd}',
+        color_discrete_sequence=px.colors.sequential.Redor,
+        template='plotly_dark'
+    )
+
+    return pie_fig, line_fig
 
 
 if (__name__ == '__main__'):
